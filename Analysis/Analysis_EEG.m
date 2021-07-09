@@ -78,8 +78,8 @@ if or(strcmp(Question.AnalysisType,'Fft') == 1, ...
         lwdata = EEG_preprocessed.(subjects{iSubjects});
 
         % Save the fft_analysis in the lw folder of each participant
-        if ~exist (Paths.analysisLW, 'dir');     mkdir(Paths.analysisLW); end
-        cd(Paths.analysisLW)
+        if ~exist (Paths.analysisLw, 'dir');     mkdir(Paths.analysisLw); end
+        cd(Paths.analysisLw)
         
 
         % FFT
@@ -133,7 +133,12 @@ if or(strcmp(Question.AnalysisType,'Fft') == 1, ...
        % Save new version of lwdata
        EEG_fft.(subjects{iSubjects}).blfft      = lwdata;
        tempLwdata (:,:,iSubjects)               = lwdata.data;
-
+       
+       % Update the Cfg.elecLabels with the new pools
+       for iChan = 1:size (EEG_fft.(subjects{iSubjects}).blfft.header.chanlocs,2)    
+            Cfg.elecLabels {iChan} = lwdata.header.chanlocs(iChan).labels;
+       end
+       
     end
         
     % Get the mean of all participants
@@ -141,6 +146,9 @@ if or(strcmp(Question.AnalysisType,'Fft') == 1, ...
     subjects{end+1}        = 'all'; 
 
     clear tempLwdata
+    
+    
+    
     
     
 %%%%%%%%%%%  
@@ -241,7 +249,7 @@ if or(strcmp(Question.AnalysisType,'ERP') == 1,...
         lwdata  = FLW_segmentation_chunk.get_lwdata(lwdata,option);
 
         % Average
-        option  = struct('operation','average','suffix','avg','is_save',1);
+        option  = struct('operation','average','suffix','avg','is_save',Cfg.LwAnalysisSave);
         lwdata  = FLW_average_epochs.get_lwdata(lwdata,option);
 
         % Put the lwdata in the EEG_fft structure + remove empty dimensions
@@ -277,6 +285,11 @@ if or(strcmp(Question.AnalysisType,'ERP') == 1,...
        % Save new version of lwdata
        EEG_ERP.(subjects{iSubjects})            = lwdata;
        tempLwdata (:,:,iSubjects)               = lwdata.data;
+       
+       % Update the Cfg.elecLabels with the new pools
+       for iChan = 1:size (EEG_fft.(subjects{iSubjects}).blfft.header.chanlocs,2)    
+            Cfg.elecLabels {iChan} = lwdata.header.chanlocs(iChan).labels;
+       end
 
     end
 
@@ -288,7 +301,9 @@ end; clear tempLwdata
 
 %% Save
 
-save('EEG_Analysis.mat','Cfg','EEG_fft','EEG_zscores','EEG_ERP','Paths','-v7.3');
+cd(Paths.analysis)
+
+save('EEG_analysis.mat','Cfg','EEG_fft','EEG_zscores','EEG_ERP','Paths','-v7.3');
 
 disp('EEG_analysis.mat saved')
 

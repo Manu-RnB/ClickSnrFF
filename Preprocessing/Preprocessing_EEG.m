@@ -26,6 +26,7 @@
     Paths.ElecLabels            = fullfile (Paths.ProjectPath, 'Preprocessing/electrodelabels.csv');
     Paths.analysis              = fullfile(Paths.ProjectPath,'Analysis');
     Paths.analysisLw            = fullfile(Paths.analysis,'LW');
+    Paths.figures               = fullfile(Paths.ProjectPath,'Figures');
 
     % Add the toolboxes to Matlab path
     if exist(Paths.toolboxes,'dir')
@@ -67,9 +68,9 @@
     fprintf('-----------------------------\n get a participant''s directory (eg.: sub-001)\n')
 
     % Select the subject
-    Paths.Sub.dir        = uigetdir (Paths.source);
-    Paths.Sub.dataDir    = fullfile (Paths.Sub.dir,'ses-001/eeg');
-    [~,subject]          = fileparts(Paths.Sub.dir);
+    Paths.Sub.dir          = uigetdir (Paths.source);
+    Paths.Sub.dataDir      = fullfile (Paths.Sub.dir,'ses-001/eeg');
+    [~,subject]            = fileparts(Paths.Sub.dir);
     
     fprintf(['--> ', subject, ' selected'])
     
@@ -102,9 +103,9 @@
     FLW_import_data.get_lwdata('filename',Paths.Sub.bdfName,'pathname',Paths.Sub.bdfPath,'is_save',1);
     
     % Load the imported bdf in the workspace
-    [~,Paths.Sub.bdfName,]=fileparts(Paths.Sub.bdfName); % remove the bdf extension from the name
-    option=struct('filename',fullfile (Paths.Sub.out, [Paths.Sub.bdfName, '.lw6']));
-    lwdata= FLW_load.get_lwdata(option);
+    [~,Paths.Sub.bdfName,] = fileparts(Paths.Sub.bdfName); % remove the bdf extension from the name
+    option                 = struct('filename',fullfile (Paths.Sub.out, [Paths.Sub.bdfName, '.lw6']));
+    lwdata                 = FLW_load.get_lwdata(option);
     
     fprintf('--> bdf file loaded \n')
     
@@ -131,10 +132,10 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
 %%%%%%%%%%%%%%%%%%%%%%%%
     
     % Open the electorelabels.csv from the preprocessing folder
-    Paths.ElecLabels            = fullfile (Paths.ProjectPath, 'Preprocessing/electrodelabels.csv');
-    option                        = delimitedTextImportOptions ("NumVariables", 1);
-    option.DataLines              = [1, Inf]; % Get all the rows containing the electrode labels
-    Cfg.elecLabels      = readtable (Paths.ElecLabels, option); 
+    Paths.ElecLabels        = fullfile (Paths.ProjectPath, 'Preprocessing/electrodelabels.csv');
+    option                  = delimitedTextImportOptions ("NumVariables", 1);
+    option.DataLines        = [1, Inf]; % Get all the rows containing the electrode labels
+    Cfg.elecLabels          = readtable (Paths.ElecLabels, option); 
 
     % Get the name associated to the old channels 
     for iChan = 1:size (Cfg.elecLabels,1) % Only run through the number of electrodes from the csv file (not the EXG3,EXG4,etc.)
@@ -356,11 +357,18 @@ disp('EEG_preprocessed structure saved')
 % - faire un badEpoch rejection à +/- 100µV et bien les visualiser pour les
 % virer manuellement. Normalement il y a une fonction comme ça dans
 % Letswave
+
 % - Regarder dans les composants et il y a souvent le heartbeat. On peut
 % souvent le voir dans l'accéléromètre et ça permet de facilement le
 % retrouver dans les IC. En général, c'est vers 1Hz et ça a la forme d'une
 % vague qui traverse tout le crâne. 
+
 % - Bien mesurer avec l'accéléromètre
+
 % - Quand on fait l'ICA, on peut faire de base plus de composants, surtout
 % que nos participants sont bien calmes et puis on vire environ 5% des ICs.
+
+% - Voir si on trouverait pas un moyen de définir l'ordre du preprocessing
+% au début du script. Si l'on fait ça, enlever les squeeze pour garder les
+% dimensions nécessaire 
 
