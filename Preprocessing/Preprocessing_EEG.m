@@ -13,7 +13,7 @@
     
     
     % Set main paths
-    Paths.computer_username     = 'emmanuelcoulon';
+    Paths.computer_username     = 'emmanuelcoulon'; %'florarosenzweig/Dropbox/Mon Mac (mac-114-318.local)';
     Paths.projectName           = 'ClickSnrFF';
     
     Paths.matlab                = fullfile ('/Users',Paths.computer_username,'Documents/MATLAB');
