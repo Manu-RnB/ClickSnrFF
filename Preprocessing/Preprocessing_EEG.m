@@ -51,9 +51,15 @@
     Cfg.filter.Order        = 4;
     
     Cfg.trigCode            = {'5'}; % Look at the continuous view in Letswave
+    
+    %BadEpochRejection
+    Cfg.badEpoThr          = 100; % +/- µV
 
     %ICA
     Cfg.ICA.numbIC         = 60; % # of IC
+    
+    %LwSave
+    Cfg.lwSave             = 1; 
     
     
     
@@ -121,7 +127,7 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
     option = struct ('filter_type', Cfg.filter.filterType,...
                      'low_cutoff',Cfg.filter.cutOff,...
                      'filter_order',Cfg.filter.Order,...
-                     'suffix','butt','is_save',1);
+                     'suffix','butt','is_save',Cfg.lwSave);
     lwdata = FLW_butterworth_filter.get_lwdata(lwdata,option);  
 
     fprintf ('--> Signal filtered \n')
@@ -144,7 +150,7 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
 
     option = struct('old_channel',{Cfg.oldChan},...
                     'new_channel',{table2cell(Cfg.elecLabels)},...
-                    'suffix','chanlabels','is_save',1);
+                    'suffix','chanlabels','is_save',Cfg.lwSave);
     lwdata = FLW_electrode_labels.get_lwdata(lwdata,option);    
 
     fprintf('--> New electrode labels applied \n')
@@ -155,7 +161,7 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     option = struct('type','channel','items',{table2cell(Cfg.elecLabels)}, ...
-                    'suffix','sel_chan','is_save',1);
+                    'suffix','sel_chan','is_save',Cfg.lwSave);
     lwdata = FLW_selection.get_lwdata(lwdata,option);
 
     fprintf('--> Unused channels removed \n')
@@ -250,12 +256,14 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
                          'x_start',0, ...
                          'x_end',Cfg.Sequence.duration(1), ...
                          'x_duration',Cfg.Sequence.duration(1), ...
-                         'suffix','ep','is_save',1);
-    % lwdata   = FLW_segmentation_separate.get_lwdata(lwdata,option);
+                         'suffix','ep','is_save',Cfg.lwSave);
+   
     lwdata   = FLW_segmentation.get_lwdata(lwdata,option);
     
     fprintf('--> Epochs segmented \n')
     
+
+
     
 %%%%%%%%%%%%%%%  
 % Rereference %
@@ -266,7 +274,7 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
     
     option      = struct('reference_list',{Cfg.Rereference.refElec}, ...
                          'apply_list',{Cfg.Rereference.applyElec}, ...
-                         'suffix','reref','is_save',1);
+                         'suffix','reref','is_save',Cfg.lwSave);
     lwdata      = FLW_rereference.get_lwdata(lwdata,option);
        
     fprintf('--> Signal rereferenced \n')  
@@ -292,7 +300,7 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
     option      = struct('ICA_mode',2, ...
                          'algorithm',1, ...
                          'num_ICs',Cfg.ICA.numbIC, ...
-                         'suffix','ica_merged','is_save',1);
+                         'suffix','ica_merged','is_save',Cfg.lwSave);
     lwdataset   = FLW_compute_ICA_merged.get_lwdataset(lwdataset,option);
 
     fprintf('--> %i ICs calculated \n',Cfg.ICA.numbIC)
@@ -330,12 +338,75 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
     close all force % closes Letswave7
     
     
+%%%%%%%%%%%%%%%%%%%%%%%  
+% Bad Epoch Rejection %
+%%%%%%%%%%%%%%%%%%%%%%%
+    
+    Log.nEpochs     = size(lwdata.data,1);
+    Log.nElec       = size(lwdata.data,2);
+    Log.BadEpo.bads = zeros(Log.nElec,Log.nEpochs);
+    Cfg.time        = [0 : lwdata.header.datasize(end)-1] * lwdata.header.xstep;
+    
+    for iEpoch = 1:Log.nEpochs
+        for iElec = 1:Log.nElec
+            disp(abs(max(lwdata.data(iEpoch,iElec,:,:,:,:))))
+            if abs(max(lwdata.data(iEpoch,iElec,:,:,:,:))) > Cfg.badEpoThr
+                Log.BadEpo.bads(iElec,iEpoch) = 1;
+                
+                % Plot bad epochs
+                plot(Cfg.time,squeeze(abs(lwdata.data(iEpoch,iElec,:,:,:,:)))); pause(1)
+                
+                % Permettre à l'utilisateur d'accepter ou pas la réjection
+                % de l'epoch qui est plottée et mettre le 1 dans
+                % Log.BadEpo.bads(iElec,iEpoch) seulement si l'utilisateur
+                % accepte
+            end
+        end
+    end
+    
+    Log.BadEpo.nBads    = sum(Log.BadEpo.bads(:));
+    Log.BadEpo.propBads = Log.BadEpo.nBads / Log.nEpochs; 
+    
+    fprintf('--> Bad Epochs Rejected: %i out of %i ep bad (%i%%)\n',...
+         Log.BadEpo.nBads,Log.nEpochs,round(Log.BadEpo.propBads*100));
+     
+     
+%      option=struct('amplitude_criterion',100,'channels_chk',1,'channels',{{'Fp1'}},'suffix','ar-amp','is_save',1);
+%      lwdata= FLW_reject_epochs_amplitude.get_lwdata(lwdata,option);
+     
+     
+     % Prendre la valeur absolue 
+     % Epoch rejection surtout utile pour les ERPs où l'on peut exclure un
+     % seul segment. Pour les fft, il faut vraiment que le signal soit
+     % catastrophique pour que ce soit nécessaire
+
+    % Commnent supprimer la mauvaise epoch ? 
+    % Tester une valeur lw.data extrême
+
+% 
+% 
+%     bads = zeros(1, size(data,1)); 
+% 
+% for iEpoch=1:size(data,1)
+%     if range(data(iEpoch,:)) > thr
+%         bads(iEpoch) = 1; 
+%     end                        
+% end
+% 
+% nBads = sum(bads(:)); 
+% propBads = nBads / numel(bads); 
+% fprintf('\n%d out of %d ep bad (%d%%)\n',...
+%         nBads,numel(bads),round(propBads*100)); 
+%     
+% bads = logical(bads)
+    
+    
 %%%%%%%%%%%  
 % Average %
 %%%%%%%%%%%
 
     % Average the epochs
-    option = struct('operation','average','suffix','avg','is_save',1);
+    option = struct('operation','average','suffix','avg','is_save',Cfg.lwSave);
     lwdata = FLW_average_epochs.get_lwdata(lwdata,option);
     
     fprintf('--> Signal averaged \n') 
