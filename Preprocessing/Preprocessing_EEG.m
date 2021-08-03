@@ -90,7 +90,7 @@
     switch outputPath
         case 'No'
             waitfor (msgbox ('Please indicate where you would like to save the lw analysis'))
-            Paths.Sub.out = uigetdir (Paths.source);
+            Paths.Sub.out = uigetdir (Paths.Sub.out);
     end;    clear outputPath MsgBox
     
     % If the lw doesn't exist, create it
@@ -292,7 +292,7 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
         % For some reason, I had to change the way we call the option  
         clear option
         option.filename{1} = fullfile (lwDir.folder,lwDir.name);
-        lwdataset= FLW_load.get_lwdataset(option);  
+        lwdataset          = FLW_load.get_lwdataset(option);  
     else
         error('Please seperate the two analysis in different folders. There shouldn''t be two reref files in the folder...');
     end
@@ -349,33 +349,49 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
     
     for iEpoch = 1:Log.nEpochs
         for iElec = 1:Log.nElec
-            disp(abs(max(lwdata.data(iEpoch,iElec,:,:,:,:))))
             if abs(max(lwdata.data(iEpoch,iElec,:,:,:,:))) > Cfg.badEpoThr
-                Log.BadEpo.bads(iElec,iEpoch) = 1;
-                
+                           
                 % Plot bad epochs
-                plot(Cfg.time,squeeze(abs(lwdata.data(iEpoch,iElec,:,:,:,:)))); pause(1)
+                figure      ('position',[1 1 400 400],'Color',[1 1 1]);
+                plot        (Cfg.time,squeeze(abs(lwdata.data(iEpoch,iElec,:,:,:,:)))); 
+                line        ([Cfg.time(1) Cfg.time(end)],[Cfg.badEpoThr Cfg.badEpoThr],...
+                             'LineWidth', 1,'LineStyle', '--', 'Color','red') % Add a threshold line
+                box off
+                ylabel      ('Amplitude (in µV)') ; xlabel ('Time (in sec)')
+                set         (gca,'LineWidth',1,'Tickdir','out')
+                annotation  ('textbox', [0.3,0.87,0.4,0.1],'String',['Max amp = ',num2str(abs(max(lwdata.data(iEpoch,iElec,:,:,:,:)))),' µV'],...
+                             'EdgeColor','none','fontsize',12)
                 
-                % Permettre à l'utilisateur d'accepter ou pas la réjection
-                % de l'epoch qui est plottée et mettre le 1 dans
-                % Log.BadEpo.bads(iElec,iEpoch) seulement si l'utilisateur
-                % accepte
+                % Manual control of the BadEpochRejection
+                Cfg.BadEpo.Quest = questdlg ('Would you like to reject this epoch?',...
+                                             'Bad Epoch Rejection','Yes','No','No');               
+                switch Cfg.BadEpo.Quest
+                    case 'Yes'
+                        Log.BadEpo.bads(iElec,iEpoch) = 1;
+                        disp(['Epoch ', num2str(iEpoch),' rejected'])
+                    case 'No'
+                        disp('Epoch not rejected')
+                end
+                close all % close the figure
             end
         end
     end
     
-    Log.BadEpo.nBads    = sum(Log.BadEpo.bads(:));
+    Log.BadEpo.nBads    = sum(Log.BadEpo.bads(:)); % Diviser la somme par le nombre d'électrodes ?
     Log.BadEpo.propBads = Log.BadEpo.nBads / Log.nEpochs; 
     
     fprintf('--> Bad Epochs Rejected: %i out of %i ep bad (%i%%)\n',...
          Log.BadEpo.nBads,Log.nEpochs,round(Log.BadEpo.propBads*100));
      
+     % Il faudrait utiliser la fonction letswave si je veux conserver la
+     % mise en forme de lwdata mais si nécessaire, je peux aussi juste
+     % enlever les epochs manuellement et faire un average manuellement
+     % aussi.
      
 %      option=struct('amplitude_criterion',100,'channels_chk',1,'channels',{{'Fp1'}},'suffix','ar-amp','is_save',1);
 %      lwdata= FLW_reject_epochs_amplitude.get_lwdata(lwdata,option);
      
      
-     % Prendre la valeur absolue 
      % Epoch rejection surtout utile pour les ERPs où l'on peut exclure un
      % seul segment. Pour les fft, il faut vraiment que le signal soit
      % catastrophique pour que ce soit nécessaire
@@ -425,10 +441,6 @@ disp('EEG_preprocessed structure saved')
 
 %% To do 
 
-% - faire un badEpoch rejection à +/- 100µV et bien les visualiser pour les
-% virer manuellement. Normalement il y a une fonction comme ça dans
-% Letswave
-
 % - Regarder dans les composants et il y a souvent le heartbeat. On peut
 % souvent le voir dans l'accéléromètre et ça permet de facilement le
 % retrouver dans les IC. En général, c'est vers 1Hz et ça a la forme d'une
@@ -441,5 +453,5 @@ disp('EEG_preprocessed structure saved')
 
 % - Voir si on trouverait pas un moyen de définir l'ordre du preprocessing
 % au début du script. Si l'on fait ça, enlever les squeeze pour garder les
-% dimensions nécessaire 
+% dimensions nécessaires
 
