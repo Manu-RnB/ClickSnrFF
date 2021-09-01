@@ -24,9 +24,9 @@
     Paths.ProjectPath           = fullfile (Paths.matlab, 'PROJECTS', Paths.projectName);
     Paths.EEGPreprocessedStruct = fullfile (Paths.ProjectPath, 'Preprocessing/EEG_preprocessed.mat');
     Paths.ElecLabels            = fullfile (Paths.ProjectPath, 'Preprocessing/electrodelabels.csv');
-    Paths.analysis              = fullfile(Paths.ProjectPath,'Analysis');
-    Paths.analysisLw            = fullfile(Paths.analysis,'LW');
-    Paths.figures               = fullfile(Paths.ProjectPath,'Figures');
+    Paths.analysis              = fullfile (Paths.ProjectPath,'Analysis');
+    Paths.analysisLw            = fullfile (Paths.analysis,'LW');
+    Paths.figures               = fullfile (Paths.ProjectPath,'Figures');
 
     % Add the toolboxes to Matlab path
     if exist(Paths.toolboxes,'dir')
@@ -53,7 +53,7 @@
     Cfg.trigCode            = {'5'}; % Look at the continuous view in Letswave
     
     %BadEpochRejection
-    Cfg.badEpoThr          = 100; % +/- µV
+    Cfg.badEpoThr          = 200; % +/- µV
 
     %ICA
     Cfg.ICA.numbIC         = 60; % # of IC
@@ -268,8 +268,25 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
 %%%%%%%%%%%%%%%  
 % Rereference %
 %%%%%%%%%%%%%%%
+
+    Cfg.Rereference.list   = {'Mastoids','Mast Right', 'Mast Left', 'All'};
+    Cfg.Rereference.answer = listdlg('PromptString',{'Which electrode to select as reference?'},...
+                                     'SelectionMode','single','ListString',Cfg.Rereference.list);                                
+
+    if strcmp(Cfg.Rereference.answer,'Mastoids')
+        Cfg.Rereference.refElec   = {'Mast1','Mast2'};
+        
+    elseif strcmp(Cfg.Rereference.answer,'Mast Right')  
+        Cfg.Rereference.refElec   = {'Mast2'};
+        
+    elseif strcmp(Cfg.Rereference.answer,'Mast Left')   
+        Cfg.Rereference.refElec   = {'Mast1'};
+        
+    else
+        Cfg.Rereference.refElec   = table2cell(Cfg.elecLabels);
+    end
     
-    Cfg.Rereference.refElec   = {'Mast1','Mast2'};
+    
     Cfg.Rereference.applyElec = table2cell(Cfg.elecLabels);
     
     option      = struct('reference_list',{Cfg.Rereference.refElec}, ...
@@ -288,8 +305,7 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
     lwDir = dir ('reref*.lw6');
     
     if size (lwDir,1) == 1
-        % option=struct('filename',{{'/Users/emmanuelcoulon/Documents/PTB/ClickSnrFF/output/lw/sub-001/Ref Before ICA/reref ep butt sub-001_task-ClickSnrFF_date-202106301439.lw6'}});
-        % For some reason, I had to change the way we call the option  
+         
         clear option
         option.filename{1} = fullfile (lwDir.folder,lwDir.name);
         lwdataset          = FLW_load.get_lwdataset(option);  
@@ -342,6 +358,10 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
 % Bad Epoch Rejection %
 %%%%%%%%%%%%%%%%%%%%%%%
     
+    % Faire une moyenne sur toutes les électrodes pour chaque époch et
+    % refaire l'analyse pour ne supprimer que s'il y a une activité extême
+    % partout
+
     Log.nEpochs     = size(lwdata.data,1);
     Log.nElec       = size(lwdata.data,2);
     Log.BadEpo.bads = zeros(Log.nElec,Log.nEpochs);
@@ -361,6 +381,7 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
                 set         (gca,'LineWidth',1,'Tickdir','out')
                 annotation  ('textbox', [0.3,0.87,0.4,0.1],'String',['Max amp = ',num2str(abs(max(lwdata.data(iEpoch,iElec,:,:,:,:)))),' µV'],...
                              'EdgeColor','none','fontsize',12)
+                % Rajouter l'epoch et l'électrode sur le plot
                 
                 % Manual control of the BadEpochRejection
                 Cfg.BadEpo.Quest = questdlg ('Would you like to reject this epoch?',...

@@ -12,7 +12,7 @@
     clear ; clc ; close
 
     % Load preprocessed data
-    Paths.computer_username     = 'emmanuelcoulon';
+    Paths.computer_username     = 'emmanuelcoulon'; %'florarosenzweig/Dropbox/Mon Mac (mac-114-318.local)';
     Paths.projectName           = 'ClickSnrFF';
     load(['/Users/',Paths.computer_username,'/Documents/MATLAB/PROJECTS/',Paths.projectName,'/Preprocessing/EEG_preprocessed.mat'])  
 
@@ -247,6 +247,8 @@ if or(strcmp(Question.AnalysisType,'ERP') == 1,...
                          'chunk_interval',Cfg.chunkSegm.interval,...
                          'suffix','chunk','is_save',Cfg.LwAnalysisSave);
         lwdata  = FLW_segmentation_chunk.get_lwdata(lwdata,option);
+        
+        %%%%%%%% BadEpochRejection
 
         % Average
         option  = struct('operation','average','suffix','avg','is_save',Cfg.LwAnalysisSave);
