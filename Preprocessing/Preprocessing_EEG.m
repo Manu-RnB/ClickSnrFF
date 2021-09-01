@@ -53,7 +53,7 @@
     Cfg.trigCode            = {'5'}; % Look at the continuous view in Letswave
     
     %BadEpochRejection
-    Cfg.badEpoThr          = 200; % +/- µV
+    Cfg.badEpoThr          = 100; % +/- µV
 
     %ICA
     Cfg.ICA.numbIC         = 60; % # of IC
@@ -262,8 +262,6 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
     
     fprintf('--> Epochs segmented \n')
     
-
-
     
 %%%%%%%%%%%%%%%  
 % Rereference %
@@ -352,90 +350,6 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
     lwdata = FLW_load.get_lwdata(option);
     
     close all force % closes Letswave7
-    
-    
-%%%%%%%%%%%%%%%%%%%%%%%  
-% Bad Epoch Rejection %
-%%%%%%%%%%%%%%%%%%%%%%%
-    
-    % Faire une moyenne sur toutes les électrodes pour chaque époch et
-    % refaire l'analyse pour ne supprimer que s'il y a une activité extême
-    % partout
-
-    Log.nEpochs     = size(lwdata.data,1);
-    Log.nElec       = size(lwdata.data,2);
-    Log.BadEpo.bads = zeros(Log.nElec,Log.nEpochs);
-    Cfg.time        = [0 : lwdata.header.datasize(end)-1] * lwdata.header.xstep;
-    
-    for iEpoch = 1:Log.nEpochs
-        for iElec = 1:Log.nElec
-            if abs(max(lwdata.data(iEpoch,iElec,:,:,:,:))) > Cfg.badEpoThr
-                           
-                % Plot bad epochs
-                figure      ('position',[1 1 400 400],'Color',[1 1 1]);
-                plot        (Cfg.time,squeeze(abs(lwdata.data(iEpoch,iElec,:,:,:,:)))); 
-                line        ([Cfg.time(1) Cfg.time(end)],[Cfg.badEpoThr Cfg.badEpoThr],...
-                             'LineWidth', 1,'LineStyle', '--', 'Color','red') % Add a threshold line
-                box off
-                ylabel      ('Amplitude (in µV)') ; xlabel ('Time (in sec)')
-                set         (gca,'LineWidth',1,'Tickdir','out')
-                annotation  ('textbox', [0.3,0.87,0.4,0.1],'String',['Max amp = ',num2str(abs(max(lwdata.data(iEpoch,iElec,:,:,:,:)))),' µV'],...
-                             'EdgeColor','none','fontsize',12)
-                % Rajouter l'epoch et l'électrode sur le plot
-                
-                % Manual control of the BadEpochRejection
-                Cfg.BadEpo.Quest = questdlg ('Would you like to reject this epoch?',...
-                                             'Bad Epoch Rejection','Yes','No','No');               
-                switch Cfg.BadEpo.Quest
-                    case 'Yes'
-                        Log.BadEpo.bads(iElec,iEpoch) = 1;
-                        disp(['Epoch ', num2str(iEpoch),' rejected'])
-                    case 'No'
-                        disp('Epoch not rejected')
-                end
-                close all % close the figure
-            end
-        end
-    end
-    
-    Log.BadEpo.nBads    = sum(Log.BadEpo.bads(:)); % Diviser la somme par le nombre d'électrodes ?
-    Log.BadEpo.propBads = Log.BadEpo.nBads / Log.nEpochs; 
-    
-    fprintf('--> Bad Epochs Rejected: %i out of %i ep bad (%i%%)\n',...
-         Log.BadEpo.nBads,Log.nEpochs,round(Log.BadEpo.propBads*100));
-     
-     % Il faudrait utiliser la fonction letswave si je veux conserver la
-     % mise en forme de lwdata mais si nécessaire, je peux aussi juste
-     % enlever les epochs manuellement et faire un average manuellement
-     % aussi.
-     
-%      option=struct('amplitude_criterion',100,'channels_chk',1,'channels',{{'Fp1'}},'suffix','ar-amp','is_save',1);
-%      lwdata= FLW_reject_epochs_amplitude.get_lwdata(lwdata,option);
-     
-     
-     % Epoch rejection surtout utile pour les ERPs où l'on peut exclure un
-     % seul segment. Pour les fft, il faut vraiment que le signal soit
-     % catastrophique pour que ce soit nécessaire
-
-    % Commnent supprimer la mauvaise epoch ? 
-    % Tester une valeur lw.data extrême
-
-% 
-% 
-%     bads = zeros(1, size(data,1)); 
-% 
-% for iEpoch=1:size(data,1)
-%     if range(data(iEpoch,:)) > thr
-%         bads(iEpoch) = 1; 
-%     end                        
-% end
-% 
-% nBads = sum(bads(:)); 
-% propBads = nBads / numel(bads); 
-% fprintf('\n%d out of %d ep bad (%d%%)\n',...
-%         nBads,numel(bads),round(propBads*100)); 
-%     
-% bads = logical(bads)
     
     
 %%%%%%%%%%%  
