@@ -11,6 +11,8 @@
 %%%%%%%%%%%%%%%%%%
 
     clear ; clc ; close
+    
+    global Cfg EEG_fft EEG_zscores EEG_ERP Paths
 
     % Load data
     Paths.computer_username     = 'emmanuelcoulon';

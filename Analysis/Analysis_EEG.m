@@ -9,7 +9,7 @@
 % Initial setups %
 %%%%%%%%%%%%%%%%%%
 
-    clear ; clc ; close
+    clear ; % clc ; close
 
     % Load preprocessed data
     Paths.computer_username     = 'emmanuelcoulon'; %'florarosenzweig/Dropbox/Mon Mac (mac-114-318.local)';
@@ -28,7 +28,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%
 % Analysis parameters %
 %%%%%%%%%%%%%%%%%%%%%%%
-
+    
+    % General
     Cfg.subjects            = fieldnames(EEG_preprocessed); % Subject names
     subjects                = Cfg.subjects;                 
     Cfg.fs                  = 512;                          % Sampling frequency
@@ -39,15 +40,26 @@
     Cfg.whichMeterUnrel     = [1,2,4,5,7,8,10,11];          % Meter-unrelated frequencies
     Cfg.frontalPool         = {'F1','Fz','F2','FC1','FCz','FC2','C1','Cz','C2'};
     Cfg.frontalPoolStr      = join (string (Cfg.frontalPool));
+    
+    % Baseline correction
     Cfg.bl_snr.lowBin       = 2;
     Cfg.bl_snr.highBin      = 5;
+    
+    % Filters
     Cfg.lowPass.filterType  = 'lowpass';
     Cfg.lowPass.cutoff      = 30;
     Cfg.lowPass.filterOrder = 4;
+    
+    % Segmentation
     Cfg.chunkSegm.onset     = 0;
     Cfg.chunkSegm.duration  = 2.4;
     Cfg.chunkSegm.interval  = 2.4;
-    Cfg.LwAnalysisSave      = 0;
+    
+    % BadEpochRejection
+    Cfg.badEpoThr           = 100; % +/- µV
+    Cfg.channels            = Cfg.Rereference.applyElec;
+    Cfg.LwAnalysisSave      = 1;
+
     
     
     % Add the "-" in the "sub-00x" name (useful to navigate through the BIDS directories)
@@ -229,7 +241,7 @@ if or(strcmp(Question.AnalysisType,'ERP') == 1,...
     for iSubjects = 1:length(Cfg.subDir) % Not take the last subject which reprensents the mean of all participants
 
         % Extraction of the data
-        lwdata = EEG_preprocessed.(subjects{iSubjects});
+        lwdata  = EEG_preprocessed.(subjects{iSubjects});
 
         % Save the ERP_analysis in the lw folder of each participant
         cd(Paths.analysisLw)
@@ -247,9 +259,28 @@ if or(strcmp(Question.AnalysisType,'ERP') == 1,...
                          'chunk_interval',Cfg.chunkSegm.interval,...
                          'suffix','chunk','is_save',Cfg.LwAnalysisSave);
         lwdata  = FLW_segmentation_chunk.get_lwdata(lwdata,option);
+       
         
-        %%%%%%%% BadEpochRejection
+        % BadEpochRejection
+        option  = struct('amplitude_criterion',Cfg.badEpoThr,'channels_chk',1,'channels',{Cfg.channels},'suffix','ar-amp','is_save',1);
+        lwdata  = FLW_reject_epochs_amplitude.get_lwdata(lwdata,option);
+        
+        % Visualization of the BadEpochRejection
+        Log.nChunks     = size(lwdata.data,1);
+        Log.nElec       = size(lwdata.data,2);
+        Log.BadEpo.bads = zeros(Log.nElec,Log.nEpochs);
+        Cfg.time        = [0 : lwdata.header.datasize(end)-1] * lwdata.header.xstep;
+        
+        for iChunks = 1:Log.nChunks
+            if max(abs(lwdata.data(iChunks,:,:,:,:,:))) > Cfg.badEpoThr
+                
+                disp([num2str(iChunks),'rejected'])
+                
+            end
+            
+        end
 
+        
         % Average
         option  = struct('operation','average','suffix','avg','is_save',Cfg.LwAnalysisSave);
         lwdata  = FLW_average_epochs.get_lwdata(lwdata,option);
@@ -289,7 +320,7 @@ if or(strcmp(Question.AnalysisType,'ERP') == 1,...
        tempLwdata (:,:,iSubjects)               = lwdata.data;
        
        % Update the Cfg.elecLabels with the new pools
-       for iChan = 1:size (EEG_fft.(subjects{iSubjects}).blfft.header.chanlocs,2)    
+       for iChan = 1:size (EEG_ERP.(subjects{iSubjects}).header.chanlocs,2)    
             Cfg.elecLabels {iChan} = lwdata.header.chanlocs(iChan).labels;
        end
 
