@@ -44,6 +44,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Preprocessing parameters %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    % Conditions
+    Cfg.condNames           = {'ClickSnrFF' };
+    condNames               = Cfg.condNames;
     
     %Butterworth filter
     Cfg.filter.filterType   = 'highpass';
@@ -51,6 +55,9 @@
     Cfg.filter.Order        = 4;
     
     Cfg.trigCode            = {'5'}; % Look at the continuous view in Letswave
+    
+    % Rereference
+    Cfg.Rereference.refElec   = {'Mast1','Mast2'};
     
     %BadEpochRejection
     Cfg.badEpoThr          = 100; % +/- µV
@@ -76,13 +83,13 @@
     % Select the subject
     Paths.Sub.dir          = uigetdir (Paths.source);
     Paths.Sub.dataDir      = fullfile (Paths.Sub.dir,'ses-001/eeg');
-    [~,subject]            = fileparts(Paths.Sub.dir);
+    [~,Log.subject]        = fileparts(Paths.Sub.dir);
     
-    fprintf(['--> ', subject, ' selected'])
+    fprintf(['--> ', Log.subject, ' selected'])
     
     % Select the lw output folder
     if ~exist (Paths.lw, 'dir');     mkdir(Paths.lw); end
-    Paths.Sub.out         = fullfile (Paths.lw, subject);
+    Paths.Sub.out         = fullfile (Paths.lw, Log.subject);
     MsgBox                = {'Would you like to save the preprocessing in this specific directory',...
                             ['Current Directrory : ',Paths.Sub.out]};
     outputPath            = questdlg (MsgBox, 'Analysis Directory','Yes','No','Yes');
@@ -119,6 +126,8 @@
 %% Preprocessing
 
 fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
+
+Paths.preprocessinglw       = fullfile(Paths.lw,Log.subject);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
 % High-Pass Butterworth filter %
@@ -178,8 +187,8 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
 
         case 'No'
             disp('No channel interpolated')
-            Cfg.Interpolation.InterpElec  = 'None';
-            Cfg.Interpolation.ClosestElec = 'None';
+            Log.Interpolation.InterpElec  = 'None';
+            Log.Interpolation.ClosestElec = 'None';
 
         case 'Yes'
             letswave7
@@ -212,16 +221,16 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
 
                         else
                             warning ('The file that was created last is not a chan_interp file')                           
-                            Cfg.Interpolation.InterpElec  = 'None';
-                            Cfg.Interpolation.ClosestElec = 'None';
+                            Log.Interpolation.InterpElec  = 'None';
+                            Log.Interpolation.ClosestElec = 'None';
                         end
 
                         % Complete a dialogbox to indicate the parameters of the interpolation (further used in the ReadMe.txt)
                         chan_interp = inputdlg({'Enter the channel(s) that was/were interpolated', ...
                                                 'Enter the number of closest electrodes selected'},'Interpolation');
 
-                        Cfg.Interpolation.InterpElec  = chan_interp {1};
-                        Cfg.Interpolation.ClosestElec = chan_interp {2};
+                        Log.Interpolation.InterpElec  = chan_interp {1};
+                        Log.Interpolation.ClosestElec = chan_interp {2};
 
                         Cfg.Interpolation.interpFinished = 'Yes'; % stops the while loop
 
@@ -345,9 +354,6 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
         end
     end
 
-    % Load the new ICA files
-    option = struct('filename',fullfile(Cfg.ICAFile.folder,Cfg.ICAFile.name));
-    lwdata = FLW_load.get_lwdata(option);
     
     close all force % closes Letswave7
     
@@ -356,15 +362,54 @@ fprintf('\n\n-----------------------------\n Start of the preprocessing\n')
 % Average %
 %%%%%%%%%%%
 
-    % Average the epochs
-    option = struct('operation','average','suffix','avg','is_save',Cfg.lwSave);
-    lwdata = FLW_average_epochs.get_lwdata(lwdata,option);
+    Cfg.ICADir = dir ([Paths.preprocessinglw,'/sp_filter*.lw6']);
+
+    for iCond = 1: size(condNames,2)
+        
+        % Load sp_filter data
+        option  = struct('filename',fullfile(Paths.preprocessinglw,Cfg.ICADir(iCond).name));
+        lwdata  = FLW_load.get_lwdata(option);
+        
+        % Average the epochs
+        option = struct('operation','average','suffix','avg','is_save',Cfg.lwSave);
+        lwdata = FLW_average_epochs.get_lwdata(lwdata,option);
+        
+        % Put the lwdata in the EEG_preprocessed structure
+        Log.subject = strrep(Log.subject,'-',''); 
+        EEG_preprocessed.(condNames{iCond}).(Log.subject) = lwdata;
+        
+    end
+    
     
     fprintf('--> Signal averaged \n') 
+    
+    
+%% Write ReadMe file to detail the current analysis
 
-    % Put the lwdata in the EEG_preprocessed structure
-    subject = strrep(subject,'-',''); 
-    EEG_preprocessed.(subject) = lwdata;
+    Log.ReadMe.commentQuest = questdlg ('Would you like to add a specific comment about this analysis?', ...
+                                        'Add a comment','Yes','No','No');
+
+    switch Log.ReadMe.commentQuest
+        case 'No'
+            Log.ReadMe.comment = {' '};
+        case 'Yes'
+            Log.ReadMe.comment = inputdlg ('Please enter your comment here','ReadMe comment');
+    end
+
+    ReadMe = fopen('ReadMe.txt','w');
+    
+    fprintf(ReadMe,['\nSummary of the Preprocessing \n---------------------------\n\n', ...
+                    'Subject ID : ', Log.subject, '\n\n', ...
+                    'Date of analysis : ', datestr(now),'\n\n', ...
+                    'Comment : ', Log.ReadMe.comment{1},'\n\n\n', ...
+                    'Butterworth filter  \n------------------ \n \t filter type : ',Cfg.filter.filterType  , '\n \t low cutoff : ',num2str(Cfg.filter.cutOff) , '\n\t filter order : ',num2str(Cfg.filter.Order),'\n\n', ...
+                    'Removal of unused channels \n--------------------------\n\n', ...
+                    'Channel interpolation   \n----------------------\n \t interpolated channel(s) : ', Log.Interpolation.InterpElec, '\n \t number of closest electrodes selected : ',Log.Interpolation.ClosestElec,'\n\n', ...
+                    'Independent component analysis \n------------------------------ \n \t number of ICs : ', num2str(Cfg.ICA.numbIC),...
+                    ]);
+    
+    fclose(ReadMe);    
+    
          
 
 %% Save the new EEG_prep
